@@ -27,9 +27,16 @@ Actions → **FIP Build** → Run workflow:
 - `MODEL`: `glinet_gl-mt5000`
 - `FIP_VERSION`: **`SP2`**(MT7987 必须用 SP2 / TF-A 20260123)
 - `FSTHEME`: `gl`(GL 风格恢复界面,可选)
-- 其余默认
+- `REPO_URL`: **你的 fork 地址**(如 `https://github.com/Kitsune2077/bl-mt798x-dhcpd`)
+- `REPO_BRANCH`: **`mt5000-support`**
 
-产物在 run 的 Artifacts 里:`bl2.img` 与 `mt7987_glinet_gl-mt5000_fip.bin`。
+> ⚠️ 注意:此 workflow 不使用 actions/checkout,而是按 `REPO_URL`/`REPO_BRANCH`
+> 重新 clone 源码——**fork 上构建自己的分支时必须显式填写这两项**,否则会
+> 静默构建上游 master(没有 MT5000,产物为空)。
+
+产物发布在该次 run 对应的 GitHub Release 中:
+- `bl2-mt7987_glinet_gl-mt5000_SP2_md5-<hash>_<date>.img` — BL2 预加载器
+- `fip-mt7987_glinet_gl-mt5000_SP2-Yuzhii-dhcpd_md5-<hash>_<date>.bin` — FIP(BL31+U-Boot)
 
 ### 方式 B:本地编译(Linux)
 
@@ -59,7 +66,8 @@ dd if=/dev/mmcblk0 of=fip-backup.bin bs=512 skip=13312 count=4096
 
 ### 1. 写入 BL2 + FIP
 
-把编译产物 `bl2.img`、`*_fip.bin` scp 到 `/tmp`,然后:
+把 Release 里的 `bl2-*.img`、`fip-*.bin` scp 到 `/tmp`(下文以
+`bl2.img` / `fip.bin` 代称),然后:
 
 ```sh
 # BL2 -> eMMC boot0 硬件分区
@@ -69,7 +77,7 @@ sync
 echo 1 > /sys/block/mmcblk0boot0/force_ro
 
 # FIP -> fip 分区(0x680000 = 扇区 13312)
-dd if=/tmp/mt7987_glinet_gl-mt5000_fip.bin of=/dev/mmcblk0 bs=512 seek=13312 conv=notrunc
+dd if=/tmp/fip.bin of=/dev/mmcblk0 bs=512 seek=13312 conv=notrunc
 sync
 ```
 
@@ -108,6 +116,11 @@ RAM 引导起 bl U-Boot 后,用其菜单/TFTP 把 BL2、FIP 永久写入
   反向 `dd` 回去即可。
 
 ## 六、已知限制 / 待验证
+
+- **编译已验证**(GitHub Actions,SP2):产出 bl2 + fip。
+- **尚未真机验证**:DRAM 初始化使用 MT7987 eMMC DDR4 通用配置(设备为
+  1GB DDR4),首次上电请接串口(115200)观察 DRAM size 是否为 1024MB、
+  eMMC 是否枚举;failsafe Web 请从 WAN 口访问。
 
 - DRAM 初始化使用 MT7987 eMMC DDR4 通用配置(与 RFB 同),1GB DDR4 预期
   兼容;首次上电请接串口观察 DRAM size 是否为 1024MB。
