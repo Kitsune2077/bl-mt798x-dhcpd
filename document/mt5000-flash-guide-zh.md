@@ -43,8 +43,9 @@ Actions → **FIP Build** → Run workflow:
 ```sh
 sudo apt install gcc-aarch64-linux-gnu libssl-dev device-tree-compiler \
                  python3-dev swig libgnutls28-dev
-./build.sh glinet_gl-mt5000 mt7987 SP2 FSTHEME=gl
-# 产物: output/mt7987_glinet_gl-mt5000/{bl2.img, fip}
+# BOARD/SOC/VERSION 都是环境变量(build.sh 不吃位置参数)
+BOARD=glinet_gl-mt5000 SOC=mt7987 VERSION=SP2 FSTHEME=gl ./build.sh
+# 产物: output/ 下的 bl2-*.img 与 fip-*.bin
 ```
 
 ## 三、刷入(路径 A:系统还能启动 —— 推荐)
@@ -93,17 +94,37 @@ https://github.com/981213/mtk_uartboot)在 BootROM 阶段把 BL2/FIP 先加载�
 RAM 运行,再通过其 Web/TFTP 界面写回:
 
 ```sh
-# 在路由器重启瞬间执行(抓住 BootROM 握手窗口):
+# 在路由器重启瞬间执行(抓住 BootROM 握手窗口)。
+# -p 用本仓库构建出的 bl2-*.img(内含 MT7987 eMMC DDR4 的 DRAM 初始化),
+# -f 用 fip-*.bin。
 ./mtk_uartboot -s /dev/ttyUSB0 -a \
-  -p bl2-mt7987-emmc-ddr4-ram.bin \
-  -f mt7987_glinet_gl-mt5000_fip.bin
+  -p bl2-mt7987_glinet_gl-mt5000_SP2_md5-*.img \
+  -f fip-mt7987_glinet_gl-mt5000_SP2-*.bin
 ```
 
 RAM 引导起 bl U-Boot 后,用其菜单/TFTP 把 BL2、FIP 永久写入
 (与 GL-MT2500 的社区流程一致,详见
 [Debricking a GL-MT2500A with UART](https://iraklijani.com/blog/debricking-a-gl-mt2500a-brume-2-with-uart))。
 
-## 五、刷入后怎么用
+## 五、关于 GPT(通常不需要动)
+
+`mt798x_gpt/mt7987-gl_mt5000.json` 描述 GL 标准 eMMC 布局
+(u-boot-env@0x400000 / factory / fip@0x680000 / kernel@0xC80000),
+**出厂 GPT 已存在,正常刷 BL2/FIP 无需重建**。仅当 GPT 被误删/需恢复时:
+
+```sh
+# 该脚本会处理 mt798x_gpt/ 下所有 json,产物在 output_gpt/gpt-<name>.bin
+# (需要 python2.7;只想生成本板可先把其它 json 临时移走)
+VERSION=SP2 ./generate_gpt.sh      # 等价于 make gpt VERSION=SP2
+
+# 生成后用 failsafe Web 的 Flash Editor,或 UART 引导后的 U-Boot
+# (gpt write mmc 0 $loadaddr)写回
+```
+
+> 重建 GPT 前务必先用 failsafe Web 备份全盘（MMC 设备备份 200~300MB 量级）。
+
+## 六、刷入后怎么用
+
 
 - **进 failsafe Web**:开机时长按复位键(或开机后连按 5 次复位键,取决于
   版本),指示灯闪烁后从 **WAN 口** 访问 `http://192.168.1.1`。
@@ -115,16 +136,14 @@ RAM 引导起 bl U-Boot 后,用其菜单/TFTP 把 BL2、FIP 永久写入
 - **回滚本 U-Boot**:用第一步备份的 `bl2-backup.bin`、`fip-backup.bin`
   反向 `dd` 回去即可。
 
-## 六、已知限制 / 待验证
+## 七、已知限制 / 待验证
 
-- **编译已验证**(GitHub Actions,SP2):产出 bl2 + fip。
+- **编译已验证**(GitHub Actions,SP2):产出 bl2 + fip,且 FIP 内已确认含
+  `glinet,gl-mt5000` / `GL.iNet GL-MT5000` 板级标识与 `MT7987>` 提示符。
 - **尚未真机验证**:DRAM 初始化使用 MT7987 eMMC DDR4 通用配置(设备为
   1GB DDR4),首次上电请接串口(115200)观察 DRAM size 是否为 1024MB、
   eMMC 是否枚举;failsafe Web 请从 WAN 口访问。
-
-- DRAM 初始化使用 MT7987 eMMC DDR4 通用配置(与 RFB 同),1GB DDR4 预期
-  兼容;首次上电请接串口观察 DRAM size 是否为 1024MB。
-- FIP/BL2 的 `emmc_write_*` 均按 GL 标准布局(fip@0x680000);若你的机器
-  GPT 有差异,先在 failsafe Web 的 Flash Editor / `mmc part` 核对。
+- FIP/BL2 的写入位置按 GL 标准布局(fip@0x680000、BL2 在 boot0);若你的
+  机器 GPT 有差异,先在 failsafe Web 的 Flash Editor / `mmc part` 核对。
 - LAN 口(交换机下的 lan1/lan2)在 U-Boot 里不可用——所有网络恢复操作
   请走 WAN 口。
