@@ -5,18 +5,26 @@
 	},
 	"factory": {
 		"start": 9216,
-		"end": 13311
-	},
-	"fip": {
-		"start": 13312,
 		"end": 17407
 	},
-	"kernel": {
+	"fip": {
+		"start": 17408,
+		"end": 21503
+	},
+	"cfg": {
+		"start": 21504,
+		"end": 25599
+	},
+	"log": {
 		"start": 25600,
-		"end": 91135
+		"end": 29695
+	},
+	"kernel": {
+		"start": 29696,
+		"end": 95231
 	},
 	"rootfs": {
-		"start": 91136,
+		"start": 95232,
 		"end": 15269887
 	}
 }
