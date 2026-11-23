@@ -1,0 +1,56 @@
+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
+
+/dts-v1/;
+#include "mt7987a.dtsi"
+#include "mt7987-emmc.dtsi"
+#include <dt-bindings/input/input.h>
+
+/ {
+	model = "GL.iNet GL-MT5000";
+	compatible = "glinet,gl-mt5000",
+		     "mediatek,mt7987a", "mediatek,mt7987";
+
+	chosen {
+		bootargs = "console=ttyS0,115200n1 loglevel=8 \
+			    earlycon=uart8250,mmio32,0x11000000 \
+			    pci=pcie_bus_perf root=PARTLABEL=rootfs rootwait";
+		stdout-path = "serial0:115200n8";
+	};
+
+	aliases {
+		serial0 = &uart0;
+	};
+
+	config {
+		bootcmd = "mtkboardboot";
+		blink_led = "white:system";
+		system_led = "blue:power";
+	};
+
+	gpio-keys {
+		compatible = "gpio-keys";
+
+		reset {
+			label = "reset";
+			linux,code = <KEY_RESTART>;
+			gpios = <&pio 4 GPIO_ACTIVE_LOW>;
+			debounce-interval = <10>;
+		};
+	};
+
+	gpio-leds {
+		compatible = "gpio-leds";
+
+		led_power: led-power {
+			label = "blue:power";
+			gpios = <&pio 44 GPIO_ACTIVE_LOW>;
+			default-state = "on";
+		};
+
+		led-system {
+			label = "white:system";
+			gpios = <&pio 7 GPIO_ACTIVE_LOW>;
+			default-state = "off";
+		};
+	};
+};

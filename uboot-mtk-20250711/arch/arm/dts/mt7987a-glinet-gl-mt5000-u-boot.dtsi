@@ -1,0 +1,53 @@
+// SPDX-License-Identifier: GPL-2.0
+
+/*
+ * U-Boot-only hardware description for GL.iNet GL-MT5000 (Brume 3).
+ *
+ * Ethernet topology (per openwrt PR #24237 board support):
+ *   GMAC0 -> RTL8366UB switch (lan1/lan2; no switch driver in U-Boot,
+ *           left disabled - the failsafe web UI is not reachable via LAN)
+ *   GMAC1 -> MT7987 internal 2.5G PHY @15 (WAN port)
+ *
+ * The RFB GMAC1 wiring (including the i2p5gbe LED pinctrl) is reused
+ * verbatim so PHY init stays aligned with the MediaTek U-Boot driver.
+ */
+
+#include "mt7987a-u-boot.dtsi"
+#include "mt7987-netsys-u-boot.dtsi"
+
+/ {
+	model = "GL.iNet GL-MT5000";
+	compatible = "glinet,gl-mt5000", "mediatek,mt7987",
+		     "mediatek,mt7987-emmc-rfb";
+
+	bl2_verify {
+		bl2_compatible = "emmc";
+	};
+};
+
+&eth1 {
+	status = "okay";
+	pinctrl-names = "i2p5gbe-led";
+	pinctrl-0 = <&i2p5gbe_led0_pins>;
+	phy-mode = "xgmii";
+	phy-handle = <&phy15>;
+
+	phy15: ethernet-phy@15 {
+		compatible = "ethernet-phy-ieee802.3-c45";
+		reg = <15>;
+		phy-mode = "xgmii";
+	};
+};
+
+&mmc0 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&mmc_pins_default>;
+	max-frequency = <48000000>;
+	bus-width = <8>;
+	cap-mmc-highspeed;
+	cap-mmc-hw-reset;
+	vmmc-supply = <&reg_3p3v>;
+	vqmmc-supply = <&reg_3p3v>;
+	non-removable;
+	status = "okay";
+};
