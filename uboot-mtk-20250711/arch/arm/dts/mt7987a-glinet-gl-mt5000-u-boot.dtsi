@@ -4,14 +4,16 @@
  * U-Boot-only hardware description for GL.iNet GL-MT5000 (Brume 3).
  *
  * Ethernet topology (per openwrt PR #24237 board support):
- *   GMAC0 -> RTL8366UB switch (lan1/lan2; no switch driver in U-Boot,
- *           left disabled - the failsafe web UI is not reachable via LAN)
+ *   GMAC0 -> RTL8366UB switch (lan1/lan2), 2500BASE-X fixed link
  *   GMAC1 -> MT7987 internal 2.5G PHY @15 (WAN port)
  *
- * The RFB GMAC1 wiring (including the i2p5gbe LED pinctrl) is reused
- * verbatim so PHY init stays aligned with the MediaTek U-Boot driver.
+ * Both are enabled: GMAC1 gives the failsafe web UI/DHCP on the WAN port,
+ * GMAC0 plus the RTL8366UB driver (drivers/net/mtk_eth/rtl8366ub.c) gives
+ * it on lan1/lan2 as well. The RFB wiring is reused verbatim so PHY init
+ * stays aligned with the MediaTek U-Boot driver.
  */
 
+#include <dt-bindings/gpio/gpio.h>
 #include "mt7987a-u-boot.dtsi"
 #include "mt7987-netsys-u-boot.dtsi"
 
@@ -22,6 +24,26 @@
 
 	bl2_verify {
 		bl2_compatible = "emmc";
+	};
+};
+
+&eth0 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&mdio0_pins>;
+	phy-mode = "2500base-x";
+	mediatek,switch = "auto";
+	/*
+	 * Board reset line is active-low (Linux DT uses GPIO_ACTIVE_LOW).
+	 * mtk_switch_init() drives the descriptor 0 -> 1, which with
+	 * GPIO_ACTIVE_HIGH ends at the physical level high, i.e. released.
+	 */
+	reset-gpios = <&pio 48 GPIO_ACTIVE_HIGH>;
+
+	fixed-link {
+		speed = <2500>;
+		full-duplex;
+		pause;
 	};
 };
 

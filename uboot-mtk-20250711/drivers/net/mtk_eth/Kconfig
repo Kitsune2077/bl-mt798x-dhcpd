@@ -37,4 +37,13 @@ config MTK_ETH_SWITCH_AN8855
 	bool "Support for Airoha AN8855 ethernet switch"
 	default y if TARGET_MT7981 || TARGET_MT7987
 
+config MTK_ETH_SWITCH_RTL8366UB
+	bool "Support for Realtek RTL8366UB ethernet switch"
+	help
+	  Minimal driver for the Realtek RTL8366UB (RTL8371C) switch found on
+	  GL.iNet GL-MT5000 (Brume 3). It does not implement DSA or bridge
+	  offload; it only brings the switch out of reset into a flat VLAN 1
+	  forwarding state so the bootloader can reach the LAN ports.
+	default y if TARGET_MT7987
+
 endif # MEDIATEK_ETH
