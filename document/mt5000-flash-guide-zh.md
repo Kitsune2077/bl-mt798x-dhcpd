@@ -9,7 +9,8 @@
 |---|---|
 | `uboot-mtk-20250711/configs/mt7987_glinet_gl-mt5000_defconfig` | 默认变体(全功能:Web 恢复界面 + DHCPD + Flash Editor + 多语言) |
 | `uboot-mtk-20250711/arch/arm/dts/mt7987a-glinet-gl-mt5000.dts` | 板级 DTS(复位键 GPIO4,电源灯 GPIO44,系统灯 GPIO7,eMMC) |
-| `uboot-mtk-20250711/arch/arm/dts/mt7987a-glinet-gl-mt5000-u-boot.dtsi` | U-Boot 侧硬件描述(**仅启用 GMAC1 = WAN 口内置 2.5G PHY**,LAN 交换机无驱动不启用;eMMC 保守 48MHz / 3.3V) |
+| `uboot-mtk-20250711/arch/arm/dts/mt7987a-glinet-gl-mt5000-u-boot.dtsi` | U-Boot 侧硬件描述(GMAC1 = WAN 口内置 2.5G PHY;GMAC0 = RTL8366UB 交换机固定 2500BASE-X;eMMC 保守 48MHz / 3.3V) |
+| `uboot-mtk-20250711/drivers/net/mtk_eth/rtl8366ub.c` | RTL8366UB 交换机最小驱动(复位后重建 VLAN1 全口 untagged 转发、CPU 口 HS-GMII、关闭 RTL8_4 标签),**让 LAN 口在 U-Boot/failsafe 中可用** |
 | `atf-20240117-bacca82a8/configs/mt7987_glinet_gl-mt5000_defconfig` | ATF(BL2)配置,基于 MT7987 eMMC DDR4 RFB |
 | `mt798x_gpt/mt7987-gl_mt5000.json` | MT5000 **实测** eMMC GPT 布局(见下表) |
 
@@ -33,10 +34,15 @@
 
 要点:
 
-- **Failsafe Web/DHCPD 走 WAN 口(eth1 内置 2.5G PHY)**——LAN 口在 U-Boot
-  阶段没有驱动(RTL8366UB 交换机只有内核驱动)。恢复操作请接 WAN 口。
+- **Failsafe Web/DHCPD 在 WAN 口与 lan1/lan2 上都可用**:
+  - WAN(eth1,内置 2.5G PHY)——最稳的恢复入口;
+  - lan1/lan2 经 GMAC0 → RTL8366UB 交换机,由 `rtl8366ub.c` 在 U-Boot 里
+    重建扁平转发(VLAN1 全口 untagged)。若该驱动初始化失败,U-Boot 会打印
+    `rtl8366ub: ...` 并回落到仅 WAN 可用,L**不影响启动**。
+  - 交换机端口 2/3 在 MT5000 上没有引出,驱动会照常使能它们但无实际端口。
 - 刷入本 U-Boot **不改变** kernel/rootfs 布局与固件刷写流程;之后仍可用 Web
   界面刷 `factory.bin` / `sysupgrade.bin`。
+- Linux 启动后会用自己的 DSA 驱动重新配置交换机,U-Boot 的设置不会残留。
 
 ## 二、编译
 
@@ -218,10 +224,16 @@ VERSION=SP2 ./generate_gpt.sh      # 等价于 make gpt VERSION=SP2
 ## 八、已知限制 / 待验证
 
 - **编译已验证**(GitHub Actions,SP2):产 bl2 + fip,FIP 内确认含
-  `glinet,gl-mt5000` / `GL.iNet GL-MT5000` / `MT7987>` 标识。
+  `glinet,gl-mt5000` / `GL.iNet GL-MT5000` / `MT7987>` 标识,以及
+  RTL8366UB 驱动(`drivers/net/mtk_eth/rtl8366ub.o` 编译通过、FIP 内含
+  `rtl8366ub: switch configured` 字符串)。
 - **分区布局已真机验证**(2026-11-23):fip@17408、env@8192、boot0 4MiB、
   factory 4MiB。
 - **启动尚未真机验证**:DRAM 用 MT7987 eMMC DDR4 通用配置(设备 1GB DDR4),
   首次上电请接串口观察 DRAM size=1024MB、eMMC 枚举正常。
-- **LAN 口在 U-Boot 不可用**(无 RTL8366UB 驱动),所有网络恢复走 WAN 口;
-  LAN 支持需额外移植最小交换机驱动(见项目后续计划)。
+- **LAN(failsafe)驱动尚未真机验证**:串口应能看到
+  `Realtek RTL8366UB` + `rtl8366ub: switch configured (VLAN 1, CPU port 2500BASE-X)`;
+  若打印 `hw init failed` / `CPU port config failed`,说明寄存器序列需要按实机调整,
+  此时仅 WAN 口可用(LAN 驱动失败不影响启动)。
+- U-Boot 里没有 STP/IGMP snooping 概念,交换机以"全口泛洪 + MAC 学习"工作,
+  仅适合 bootloader 用途;正常系统由 Linux DSA 驱动接管。
